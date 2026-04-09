@@ -398,22 +398,6 @@ func fvwm_popup(line string, day string) {
 	if err != nil {
 		fmt.Printf("command exec error in fvwm_popup(): %s\n", err)
 	}
-
-	/*  Doesn't work, can't figure out how to escape spaces correctly
-	com := exec.Command("FvwmCommand", "-c")
-	pipe, err := fvwm.StdoutPipe()
-	if err != nil {
-		fmt.Printf("error creating pipe: %s", err)
-	}
-	defer pipe.Close()
-
-	com.Stdin = pipe
-	fvwm.Start()
-	_, err = com.Output()
-	if err != nil {
-		fmt.Printf("error running command: %s", err)
-	}
-	*/
 }
 
 //Parse a date-time string and return a string in the format Dayname Monthname Date
