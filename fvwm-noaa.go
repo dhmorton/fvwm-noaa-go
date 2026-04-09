@@ -21,7 +21,6 @@ import (
 var latitude string = "38.5743"
 var longitude string = "-121.4342"
 var station string = "KSAC"
-var file string = "fvwm-noaa-test.txt"
 
 //constants for conversion
 //kph to mph
@@ -92,12 +91,7 @@ var hourly_data []Forecast
 var current_data Observation
 
 func main() {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		fmt.Println("File error " + err.Error())
-	}
-	defer f.Close()
-	_, err = f.WriteString("Running fvwm-noaa from cron")
+	os.Setenv("FVWM_USERDIR", "/home/bob/.fvwm")
 	//var url string = "https://api.weather.gov/stations/" + station
 	var current_obs_url string = "https://api.weather.gov/stations/" + station + "/observations/latest?require_qc=false"
 	var url string = "https://api.weather.gov/points/" + latitude + "," + longitude
@@ -111,7 +105,7 @@ func main() {
 	defer imagick.Terminate()
 
 	//Get the station data
-	err = get_json(url, &station_data)
+	err := get_json(url, &station_data)
 	if err != nil {
 		fmt.Printf("get_forecast error: %v\n", err)
 	}
@@ -153,7 +147,6 @@ func main() {
 			parse_observation(observation_data)
 		}
 	}
-	f.WriteString("\nFinished runing\n")
 }
 
 //Current weather observation data from a named station
@@ -238,7 +231,7 @@ func generate_hourly_menu(data []Forecast) {
 	start_day := day
 	fvwm("DestroyMenu " + day)
 	fvwm("AddToMenu " + day + " " + day + ` Title`)
-	//nop()
+	nop()
 	for _, val := range data {
 		current_day := short_day(val.startTime)
 		//If it's a new day start a new menu
@@ -370,39 +363,40 @@ func set_button_image(imagepath string, day string, min string, max string, inde
 
 //Helper functions to pass commands to FvwmCommand
 func fvwm(line string) {
-	line = "echo -e " + line + " | FvwmCommand -c"
-	_, err := exec.Command("bash", "-c", line).Output()
+	line = "echo -e " + line + " | /usr/bin/FvwmCommand -c"
+	//println(line)
+	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
-		fmt.Printf("command exec error in fvwm(): %s", err)
+		fmt.Printf("command exec error in fvwm(): %s\n", err)
 	}
 }
 
 //not working, should just put a line
 func nop() {
-	_, err := exec.Command("bash", "-c", "+ "+"\\ "+"` Nop` | FvwmCommand -c").Output()
+	_, err := exec.Command("/bin/bash", "-c", "+ "+"\\ "+"` Nop` | /usr/bin/FvwmCommand -c").Output()
 	if err != nil {
-		fmt.Printf("command exec error in nop(): %s", err)
+		fmt.Printf("command exec error in nop(): %s\n", err)
 	}
 }
 func fvwm_no_popup(line string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' | FvwmCommand -c"
+	line = "echo -e '+ " + line + "' | /usr/bin/FvwmCommand -c"
 	//println(line)
-	_, err := exec.Command("bash", "-c", line).Output()
+	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
-		fmt.Printf("command exec error in fvwm_no_popup(): %s", err)
+		fmt.Printf("command exec error in fvwm_no_popup(): %s\n", err)
 	}
 }
 
 func fvwm_popup(line string, day string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' Popup " + day + " | FvwmCommand -c"
+	line = "echo -e '+ " + line + "' Popup " + day + " | /usr/bin/FvwmCommand -c"
 	//println(line)
-	_, err := exec.Command("bash", "-c", line).Output()
+	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
-		fmt.Printf("command exec error in fvwm_popup(): %s", err)
+		fmt.Printf("command exec error in fvwm_popup(): %s\n", err)
 	}
 
 	/*  Doesn't work, can't figure out how to escape spaces correctly
@@ -483,12 +477,12 @@ func save_image(imageURL string, isDaytime bool) string {
 
 	//generate the correct full path
 	filename := path.Base(imageURL)
-	home := os.Getenv("HOME")
+	//home := os.Getenv("HOME")
 	var tag string = "night"
 	if isDaytime {
 		tag = "day"
 	}
-	imagename := home + "/fvwm/images/" + filename + "-" + tag + ".png"
+	imagename := "/home/bob/fvwm/images/" + filename + "-" + tag + ".png"
 
 	//check to see if we already have this image
 	/*
@@ -501,7 +495,7 @@ func save_image(imageURL string, isDaytime bool) string {
 	//make the file to store the image if it doesn't exist
 	file, err := os.Create(imagename)
 	if err != nil {
-		fmt.Printf("file creation error: %s", err)
+		fmt.Printf("file creation error: %s\n", err)
 		return ""
 	}
 	defer file.Close()
