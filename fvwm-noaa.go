@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,18 +17,19 @@ import (
 	"gopkg.in/gographics/imagick.v3/imagick"
 )
 
-//Enter a location for the forcast
-//Could get lat/long from the station if I wanted
-var latitude string = "38.5743"
-var longitude string = "-121.4342"
-var station string = "KSAC"
+// Enter a location for the forcast
+// Could get lat/long from the station if I wanted
+var latitude string = "38.3521"
+var longitude string = "-122.0052"
+var station string = "KVCB"
 
-//constants for conversion
-//kph to mph
+// constants for conversion
+// kph to mph
 const kphtomph float64 = 0.62137
 
-//Pascals to mmHg
+// Pascals to mmHg
 const patommhg float64 = 0.00750062
+const fontsize string = "24"
 
 type Forecast struct {
 	name          string
@@ -92,6 +94,8 @@ var current_data Observation
 
 func main() {
 	os.Setenv("FVWM_USERDIR", "/home/bob/.fvwm")
+	//The environment variable that point to the FvwmPrompt socket
+	os.Setenv("FVWMMFL_SOCKET", "/tmp/fvwmmfl/fvwm_mfl_:0.sock")
 	//var url string = "https://api.weather.gov/stations/" + station
 	var current_obs_url string = "https://api.weather.gov/stations/" + station + "/observations/latest?require_qc=false"
 	var url string = "https://api.weather.gov/points/" + latitude + "," + longitude
@@ -149,7 +153,7 @@ func main() {
 	}
 }
 
-//Current weather observation data from a named station
+// Current weather observation data from a named station
 func parse_observation(raw interface{}) {
 	data, err := json.Marshal(raw)
 	if err != nil {
@@ -161,6 +165,11 @@ func parse_observation(raw interface{}) {
 	}
 	//Get the icon and set the button image with current temp in deg F
 	imagepath := save_image(current_data.Properties.Icon, true)
+	if imagepath != "" {
+		tempF := current_data.Properties.Temperature.Value*1.8 + 32
+		temp := strconv.FormatFloat(tempF, 'f', 1, 64)
+		set_button_image_current(imagepath, temp)
+	}
 	tempF := current_data.Properties.Temperature.Value*1.8 + 32
 	temp := strconv.FormatFloat(tempF, 'f', 1, 64)
 	set_button_image_current(imagepath, temp)
@@ -179,7 +188,7 @@ func parse_observation(raw interface{}) {
 	fvwm_no_popup("Humidity \t" + strconv.FormatFloat(current_data.Properties.RelativeHumidity.Value, 'f', 0, 64) + " %")
 }
 
-//Parses the JSON from the forecast URL to find the daily forecasts
+// Parses the JSON from the forecast URL to find the daily forecasts
 func parse_forecast(raw interface{}) []interface{} {
 	forecast := raw.(map[string]interface{})
 	for k, v := range forecast {
@@ -196,7 +205,7 @@ func parse_forecast(raw interface{}) []interface{} {
 	return nil
 }
 
-//Parses the array of forecast data
+// Parses the array of forecast data
 func parse_daily_data(data interface{}, output *[]Forecast) {
 	forecast := data.([]interface{})
 	for _, val := range forecast {
@@ -225,13 +234,13 @@ func parse_daily_data(data interface{}, output *[]Forecast) {
 	}
 }
 
-//Outputs the Hourly Forecast menus
+// Outputs the Hourly Forecast menus
 func generate_hourly_menu(data []Forecast) {
 	day := short_day(data[0].startTime)
 	start_day := day
 	fvwm("DestroyMenu " + day)
 	fvwm("AddToMenu " + day + " " + day + ` Title`)
-	nop()
+	//nop()
 	for _, val := range data {
 		current_day := short_day(val.startTime)
 		//If it's a new day start a new menu
@@ -262,7 +271,7 @@ func generate_hourly_menu(data []Forecast) {
 	}
 }
 
-//Ouputs the Forecast menu in fvwm3 syntax
+// Ouputs the Forecast menu in fvwm3 syntax
 func generate_daily_menu(data []Forecast) {
 	//The header
 	fvwm("DestroyMenu Forecast")
@@ -309,69 +318,82 @@ func generate_daily_menu(data []Forecast) {
 	}
 }
 
-//Writes the temperature on the current weather icon and saves it
+// Writes the temperature on the current weather icon and saves it
 func set_button_image_current(imagepath string, temp string) {
 	mw := imagick.MagickWand{}
 	defer mw.Destroy()
 	savepath := "/tmp/current.png"
 	//Make it fit the button
 	imagick.ConvertImageCommand([]string{
-		"magick", "-quiet", imagepath, "-resize", "57", savepath,
+		"magick", "-quiet", imagepath, "-resize", "70", savepath,
 	})
 	imagick.ConvertImageCommand([]string{
 		"magick", "-quiet",
-		"-pointsize", "18",
+		"-font", "Liberation-Sans-Bold",
+		"-pointsize", fontsize,
 		"-fill", "#330000",
 		savepath,
-		"-annotate", "+20+50", temp,
+		"-annotate", "+15+60", temp,
 		savepath,
 	})
 	fvwm("SendToModule WeatherButtons ChangeButton Current Icon " + savepath)
 }
 
-//Writes the min/max temperature on the image and puts it into the FvwmButton container
+// Writes the min/max temperature on the image and puts it into the FvwmButton container
 func set_button_image(imagepath string, day string, min string, max string, index int) {
+	if imagepath == "" {
+		return
+	}
 	mw := imagick.MagickWand{}
 	defer mw.Destroy()
 	savepath := "/tmp/" + strconv.Itoa(index) + ".png"
-	top := "text +1+12 " + day
 	bottom := min + "/" + max
 	imagick.ConvertImageCommand([]string{
-		"magick", "-quiet", imagepath, "-resize", "55", savepath,
+		"magick", "-quiet", imagepath, "-resize", "70", savepath,
 	})
 	//add the day on top
 	imagick.ConvertImageCommand([]string{
 		"magick", "-quiet",
-		"-pointsize", "18",
+		"-font", "Liberation-Sans-Bold",
+		"-pointsize", fontsize,
 		"-fill", "black",
 		savepath,
-		"-draw", top,
+		"-annotate", "+1+18", day,
 		savepath,
 	})
 	//add the min/max temp on the bottom
 	imagick.ConvertImageCommand([]string{
 		"magick", "-quiet",
-		"-pointsize", "18",
+		"-font", "Liberation-Sans-Bold",
+		"-pointsize", fontsize,
 		"-fill", "black",
 		savepath,
-		"-annotate", "+1+50", bottom,
+		"-annotate", "+1+60", bottom,
 		savepath,
 	})
 	//send the icon to the correct button station
 	fvwm("SendToModule WeatherButtons ChangeButton Day" + strconv.Itoa(index) + " Icon " + savepath)
 }
 
-//Helper functions to pass commands to FvwmCommand
+// Helper functions to pass commands to FvwmPrompt (fvwm3)
 func fvwm(line string) {
-	line = "echo -e " + line + " | /usr/bin/FvwmCommand -c"
+	line = "echo -e " + line + " | /usr/bin/FvwmPrompt"
 	//println(line)
-	_, err := exec.Command("/bin/bash", "-c", line).Output()
+	cmd := exec.Command("/bin/bash", "-c", line)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("command exec error in fvwm(): %s\n", err)
+		fmt.Printf("command exec error in fvwm(): %s\n", stderr.String())
 	}
+	//	_, err := exec.Command("/bin/bash", "-c", line).Output()
+	//
+	// if err != nil {
+	// fmt.Printf("command exec error in fvwm(): %s\n", err)
+	// }
 }
 
-//not working, should just put a line
+// not working, should just put a line
 func nop() {
 	_, err := exec.Command("/bin/bash", "-c", "+ "+"\\ "+"` Nop` | /usr/bin/FvwmCommand -c").Output()
 	if err != nil {
@@ -381,7 +403,7 @@ func nop() {
 func fvwm_no_popup(line string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' | /usr/bin/FvwmCommand -c"
+	line = "echo -e '+ " + line + "' | /usr/bin/FvwmPrompt"
 	//println(line)
 	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
@@ -392,7 +414,7 @@ func fvwm_no_popup(line string) {
 func fvwm_popup(line string, day string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' Popup " + day + " | /usr/bin/FvwmCommand -c"
+	line = "echo -e '+ " + line + "' Popup " + day + " | /usr/bin/FvwmPrompt"
 	//println(line)
 	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
@@ -400,7 +422,7 @@ func fvwm_popup(line string, day string) {
 	}
 }
 
-//Parse a date-time string and return a string in the format Dayname Monthname Date
+// Parse a date-time string and return a string in the format Dayname Monthname Date
 func parse_time(datetime string) string {
 	layout := "2006-01-02T15:04:05-07:00"
 	t, err := time.Parse(layout, datetime)
@@ -412,7 +434,7 @@ func parse_time(datetime string) string {
 	return formatted
 }
 
-//Parse a date-time string and return a 3 letter day name
+// Parse a date-time string and return a 3 letter day name
 func short_day(datetime string) string {
 	layout := "2006-01-02T15:04:05-07:00"
 	t, err := time.Parse(layout, datetime)
@@ -424,7 +446,7 @@ func short_day(datetime string) string {
 	return day
 }
 
-//Parse a date-time string and return an hour with :00
+// Parse a date-time string and return an hour with :00
 func hour(datetime string) string {
 	layout := "2006-01-02T15:04:05-07:00"
 	t, err := time.Parse(layout, datetime)
@@ -436,7 +458,7 @@ func hour(datetime string) string {
 	return hour + ":00"
 }
 
-//Parse a date-time string and return an escaped day month date H:MM string
+// Parse a date-time string and return an escaped day month date H:MM string
 func hourmin(datetime string) string {
 	layout := "2006-01-02T15:04:05-07:00"
 	t, err := time.Parse(layout, datetime)
@@ -450,7 +472,7 @@ func hourmin(datetime string) string {
 	return formatted
 }
 
-//Save the NOAA weather icons in ~/fvwm/images if it doesn't exist
+// Save the NOAA weather icons in ~/fvwm/images if it doesn't exist
 func save_image(imageURL string, isDaytime bool) string {
 	//download the image
 	image, err := http.Get(imageURL)
@@ -493,7 +515,7 @@ func save_image(imageURL string, isDaytime bool) string {
 	return imagename
 }
 
-//Get the JSON at the given URL and fill in the interface{}
+// Get the JSON at the given URL and fill in the interface{}
 func get_json(url string, result interface{}) error {
 	println(url)
 	resp, err := http.Get(url)
