@@ -19,9 +19,9 @@ import (
 
 // Enter a location for the forcast
 // Could get lat/long from the station if I wanted
-var latitude string = "38.3521"
-var longitude string = "-122.0052"
-var station string = "KVCB"
+var latitude string = "38.5743"
+var longitude string = "-121.4342"
+var station string = "KSAC"
 
 // constants for conversion
 // kph to mph
@@ -29,7 +29,7 @@ const kphtomph float64 = 0.62137
 
 // Pascals to mmHg
 const patommhg float64 = 0.00750062
-const fontsize string = "24"
+const fontsize string = "18"
 
 type Forecast struct {
 	name          string
@@ -95,6 +95,7 @@ var current_data Observation
 func main() {
 	os.Setenv("FVWM_USERDIR", "/home/bob/.fvwm")
 	//The environment variable that point to the FvwmPrompt socket
+	os.Setenv("FVWMMFL_SOCKET_PATH", "/tmp/fvwmmfl")
 	os.Setenv("FVWMMFL_SOCKET", "/tmp/fvwmmfl/fvwm_mfl_:0.sock")
 	//var url string = "https://api.weather.gov/stations/" + station
 	var current_obs_url string = "https://api.weather.gov/stations/" + station + "/observations/latest?require_qc=false"
@@ -333,7 +334,7 @@ func set_button_image_current(imagepath string, temp string) {
 		"-pointsize", fontsize,
 		"-fill", "#330000",
 		savepath,
-		"-annotate", "+15+60", temp,
+		"-annotate", "+15+50", temp,
 		savepath,
 	})
 	fvwm("SendToModule WeatherButtons ChangeButton Current Icon " + savepath)
@@ -368,7 +369,7 @@ func set_button_image(imagepath string, day string, min string, max string, inde
 		"-pointsize", fontsize,
 		"-fill", "black",
 		savepath,
-		"-annotate", "+1+60", bottom,
+		"-annotate", "+1+50", bottom,
 		savepath,
 	})
 	//send the icon to the correct button station
@@ -395,7 +396,7 @@ func fvwm(line string) {
 
 // not working, should just put a line
 func nop() {
-	_, err := exec.Command("/bin/bash", "-c", "+ "+"\\ "+"` Nop` | /usr/bin/FvwmCommand -c").Output()
+	_, err := exec.Command("/bin/bash", "-c", "+ "+"\\ "+"` Nop` | /usr/bin/FvwmPrompt").Output()
 	if err != nil {
 		fmt.Printf("command exec error in nop(): %s\n", err)
 	}
