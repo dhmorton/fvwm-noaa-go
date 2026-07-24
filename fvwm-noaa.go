@@ -287,6 +287,7 @@ func generate_daily_menu(data []Forecast) {
 	//If the 0th element has isDaytime true then start at 0
 	//otherwise use 0 for the current weather and start at 1
 	var day = data[0].isDaytime
+	//the first time build the forcast menu with the popup daily submenus
 	for i, val := range data {
 		//There are daytime and nighttime forcasts for each day
 		//The max temp is during the day and the min temp is at night
@@ -306,6 +307,22 @@ func generate_daily_menu(data []Forecast) {
 			sb.WriteString(val.shortforecast)
 			fvwm_popup(sb.String(), shortday)
 			//button image numbers start at 1 not 0
+			//set_button_image(imagepath, shortday, min, max, i/2+1)
+			day = !day
+		} else {
+			max = strconv.Itoa(int(val.temp))
+			icon := val.iconURL
+			imagepath = save_image(icon, val.isDaytime)
+			dateString = parse_time(val.startTime)
+			shortday = short_day(val.startTime)
+			day = !day
+		}
+	}
+	//the second time set the button images
+	for i, val := range data {
+		if !day && i != 0 {
+			var min string = strconv.Itoa(int(val.temp))
+			//button image numbers start at 1 not 0
 			set_button_image(imagepath, shortday, min, max, i/2+1)
 			day = !day
 		} else {
@@ -316,6 +333,7 @@ func generate_daily_menu(data []Forecast) {
 			shortday = short_day(val.startTime)
 			day = !day
 		}
+
 	}
 }
 
@@ -379,7 +397,7 @@ func set_button_image(imagepath string, day string, min string, max string, inde
 // Helper functions to pass commands to FvwmPrompt (fvwm3)
 func fvwm(line string) {
 	line = "echo -e " + line + " | /usr/bin/FvwmPrompt"
-	//println(line)
+	println(line)
 	cmd := exec.Command("/bin/bash", "-c", line)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -405,7 +423,7 @@ func fvwm_no_popup(line string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
 	line = "echo -e '+ " + line + "' | /usr/bin/FvwmPrompt"
-	//println(line)
+	println(line)
 	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
 		fmt.Printf("command exec error in fvwm_no_popup(): %s\n", err)
@@ -416,7 +434,7 @@ func fvwm_popup(line string, day string) {
 	re := regexp.MustCompile(`\s`)
 	line = re.ReplaceAllString(line, "\\ ")
 	line = "echo -e '+ " + line + "' Popup " + day + " | /usr/bin/FvwmPrompt"
-	//println(line)
+	println(line)
 	_, err := exec.Command("/bin/bash", "-c", line).Output()
 	if err != nil {
 		fmt.Printf("command exec error in fvwm_popup(): %s\n", err)
