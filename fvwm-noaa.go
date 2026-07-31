@@ -123,7 +123,7 @@ func main() {
 			//get the location first
 			d := data["relativeLocation"].(map[string]interface{})
 			loc := d["properties"].(map[string]interface{})
-			location = loc["city"].(string) + ",\\ " + loc["state"].(string)
+			location = loc["city"].(string) + "\\ " + loc["state"].(string)
 			//Get the daily forecast data, day and night, build the menu and generate button images
 			forecast_url := data["forecast"].(string)
 			err = get_json(forecast_url, &forecast_data)
@@ -177,16 +177,16 @@ func parse_observation(raw interface{}) {
 	//Make a menu with the current observations
 	fvwm("DestroyMenu CurrentWeather")
 	hourmin := hourmin(current_data.Properties.Timestamp)
-	addstring := "AddToMenu\\ CurrentWeather\\ " + strconv.Quote(hourmin) + ` Title`
+	addstring := "AddToMenu CurrentWeather " + strconv.Quote(hourmin) + ` Title`
 	fvwm(addstring)
-	fvwm_no_popup("Temperature \t" + strconv.FormatFloat(current_data.Properties.Temperature.Value*1.8+32, 'f', 1, 64) + " F")
-	fvwm_no_popup("Conditions \t" + current_data.Properties.TextDescription)
-	fvwm_no_popup("Dewpoint \t" + strconv.FormatFloat(current_data.Properties.Dewpoint.Value*1.8+32, 'f', 1, 64) + " F")
-	fvwm_no_popup("Wind Speed \t" + strconv.FormatFloat(current_data.Properties.WindSpeed.Value*kphtomph, 'f', 1, 64) + " mph")
-	fvwm_no_popup("Wind Direction \t" + strconv.FormatFloat(current_data.Properties.WindDirection.Value, 'f', 0, 64) + " deg")
-	fvwm_no_popup("Wind Gust \t" + strconv.FormatFloat(current_data.Properties.WindGust.Value*kphtomph, 'f', 1, 64) + " mph")
-	fvwm_no_popup("Pressure \t" + strconv.FormatFloat(current_data.Properties.BarometricPressure.Value*patommhg, 'f', 0, 64) + " mmHg")
-	fvwm_no_popup("Humidity \t" + strconv.FormatFloat(current_data.Properties.RelativeHumidity.Value, 'f', 0, 64) + " %")
+	fvwm_no_popup("Temperature " + strconv.FormatFloat(current_data.Properties.Temperature.Value*1.8+32, 'f', 1, 64) + " F")
+	fvwm_no_popup("Conditions " + current_data.Properties.TextDescription)
+	fvwm_no_popup("Dewpoint " + strconv.FormatFloat(current_data.Properties.Dewpoint.Value*1.8+32, 'f', 1, 64) + " F")
+	fvwm_no_popup("Wind Speed " + strconv.FormatFloat(current_data.Properties.WindSpeed.Value*kphtomph, 'f', 1, 64) + " mph")
+	fvwm_no_popup("Wind Direction " + strconv.FormatFloat(current_data.Properties.WindDirection.Value, 'f', 0, 64) + " deg")
+	fvwm_no_popup("Wind Gust " + strconv.FormatFloat(current_data.Properties.WindGust.Value*kphtomph, 'f', 1, 64) + " mph")
+	fvwm_no_popup("Pressure " + strconv.FormatFloat(current_data.Properties.BarometricPressure.Value*patommhg, 'f', 0, 64) + " mmHg")
+	fvwm_no_popup("Humidity " + strconv.FormatFloat(current_data.Properties.RelativeHumidity.Value, 'f', 0, 64) + " %")
 }
 
 // Parses the JSON from the forecast URL to find the daily forecasts
@@ -278,7 +278,7 @@ func generate_daily_menu(data []Forecast) {
 	fvwm("DestroyMenu Forecast")
 	//very particular formatting in this line
 	fvwm("AddToMenu Forecast " + strconv.Quote(location) + ` Title`)
-	fvwm_no_popup("Date  Min/Max  Conditions ")
+	//fvwm_no_popup("Date  Min/Max  Conditions ")
 	//nop()
 	var max string        //max daily temperature
 	var imagepath string  //local path to weather icon
@@ -355,6 +355,7 @@ func set_button_image_current(imagepath string, temp string) {
 		"-annotate", "+15+50", temp,
 		savepath,
 	})
+	time.Sleep(100 * time.Millisecond)
 	fvwm("SendToModule WeatherButtons ChangeButton Current Icon " + savepath)
 }
 
@@ -391,53 +392,57 @@ func set_button_image(imagepath string, day string, min string, max string, inde
 		savepath,
 	})
 	//send the icon to the correct button station
+	//but sleep first because the image doesn't get written immediately?
+	time.Sleep(100 * time.Millisecond)
 	fvwm("SendToModule WeatherButtons ChangeButton Day" + strconv.Itoa(index) + " Icon " + savepath)
 }
 
 // Helper functions to pass commands to FvwmPrompt (fvwm3)
 func fvwm(line string) {
-	line = "echo -e " + line + " | /usr/bin/FvwmPrompt"
-	println(line)
-	cmd := exec.Command("/bin/bash", "-c", line)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	if err != nil {
-		fmt.Printf("command exec error in fvwm(): %s\n", stderr.String())
-	}
-	//	_, err := exec.Command("/bin/bash", "-c", line).Output()
-	//
-	// if err != nil {
-	// fmt.Printf("command exec error in fvwm(): %s\n", err)
-	// }
+	//line = "echo " + line + " | /usr/bin/FvwmPrompt"
+	line = "FvwmPrompt " + line
+	do_cmd(line)
 }
 
 // not working, should just put a line
 func nop() {
-	_, err := exec.Command("/bin/bash", "-c", "+ "+"\\ "+"` Nop` | /usr/bin/FvwmPrompt").Output()
+	_, err := exec.Command("/bin/bash", "-c", "+ "+"` Nop` | /usr/bin/FvwmPrompt").Output()
 	if err != nil {
 		fmt.Printf("command exec error in nop(): %s\n", err)
 	}
 }
 func fvwm_no_popup(line string) {
 	re := regexp.MustCompile(`\s`)
-	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' | /usr/bin/FvwmPrompt"
-	println(line)
-	_, err := exec.Command("/bin/bash", "-c", line).Output()
-	if err != nil {
-		fmt.Printf("command exec error in fvwm_no_popup(): %s\n", err)
-	}
+	//FvwmPrompt requires a double \\ in front of spaces but each \ is escaped in go so \\\\ -> \\ in the bash command
+	//there has to be a better way to do that but idk what
+	line = re.ReplaceAllString(line, "\\\\ ")
+	line = "FvwmPrompt + " + line
+	do_cmd(line)
 }
 
 func fvwm_popup(line string, day string) {
 	re := regexp.MustCompile(`\s`)
-	line = re.ReplaceAllString(line, "\\ ")
-	line = "echo -e '+ " + line + "' Popup " + day + " | /usr/bin/FvwmPrompt"
-	println(line)
-	_, err := exec.Command("/bin/bash", "-c", line).Output()
+	line = re.ReplaceAllString(line, "\\\\ ")
+	line = "FvwmPrompt + " + line + " Popup " + day
+	do_cmd(line)
+}
+
+func do_cmd(line string) {
+	//temp: write to file
+	/*f, err := os.OpenFile("fvwm_out.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("command exec error in fvwm_popup(): %s\n", err)
+		fmt.Printf("File open error")
+	}
+	defer f.Close()
+	f.WriteString(line + "\n")*/
+
+	cmd := exec.Command("/bin/bash", "-c", line)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	time.Sleep(200 * time.Millisecond)
+	if err != nil {
+		fmt.Printf("command exec error in fvwm(): %s\n", stderr.String())
 	}
 }
 
@@ -487,7 +492,7 @@ func hourmin(datetime string) string {
 	}
 	var hour string = strconv.Itoa(t.Hour())
 	var min string = strconv.Itoa(t.Minute())
-	var formatted string = t.Weekday().String()[0:3] + "\\ " + t.Month().String()[0:3] + "\\ " + strconv.Itoa(t.Day()) + "\\ " + hour + ":" + min
+	var formatted string = t.Weekday().String()[0:3] + " " + t.Month().String()[0:3] + " " + strconv.Itoa(t.Day()) + " " + hour + ":" + min
 	return formatted
 }
 
